@@ -167,6 +167,23 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+cat > /etc/systemd/system/svdb-beat.service <<EOF
+[Unit]
+Description=SVDB Celery Beat
+After=network.target redis.service svdb-backend.service
+
+[Service]
+User=${SVDB_USER}
+Group=${SVDB_USER}
+WorkingDirectory=${SVDB_ROOT}/backend
+EnvironmentFile=${SVDB_ROOT}/.env
+ExecStart=${SVDB_ROOT}/venv/bin/celery -A config beat -l info
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 cat > /etc/systemd/system/svdb-frontend.service <<EOF
 [Unit]
 Description=SVDB Frontend (Next.js)
@@ -215,7 +232,7 @@ server {
 EOF
 
 systemctl daemon-reload
-systemctl enable --now svdb-backend svdb-worker svdb-frontend
+systemctl enable --now svdb-backend svdb-worker svdb-beat svdb-frontend
 systemctl reload nginx || systemctl restart nginx
 
 umask 077

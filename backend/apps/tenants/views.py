@@ -1,11 +1,14 @@
-from rest_framework import viewsets, views, status
+from rest_framework import viewsets, views, status, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import get_user_model
 
 from .models import Tenant, Membership, WorkCalendar, Contour, DEFAULT_CONTOURS
 from .serializers import TenantSerializer, MembershipSerializer, WorkCalendarSerializer, ContourSerializer
 from .permissions import IsTenantMember, IsTenantAdmin
+
+User = get_user_model()
 
 
 class CurrentTenantView(views.APIView):
@@ -56,6 +59,52 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(tenant=self.request.tenant)
+
+    @action(detail=False, methods=["post"])
+    def invite(self, request):
+        """Create or attach user + membership. Body: username, email?, password?, role."""
+        username = request.data.get("username")
+        role = request.data.get("role", "reader")
+        email = request.data.get("email") or ""
+        password = request.data.get("password") or ""
+        if not username:
+            return Response({"detail": "username required"}, status=400)
+        if role not in dict(Membership.Role.choices):
+            return Response({"detail": "invalid role"}, status=400)
+        user, created = User.objects.get_or_create(username=username, defaults={"email": email})
+        if created:
+            if not password:
+                return Response({"detail": "password required for new user"}, status=400)
+            user.set_password(password)
+            if email:
+                user.email = email
+            user.save()
+        elif password:
+            user.set_password(password)
+            user.save()
+        m, _ = Membership.objects.update_or_create(
+            tenant=request.tenant, user=user, defaults={"role": role, "is_active": True}
+        )
+        return Response(MembershipSerializer(m).data, status=201)
+
+
+class BrandingUploadView(views.APIView):
+    permission_classes = [IsAuthenticated, IsTenantMember, IsTenantAdmin]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def post(self, request):
+        tenant = request.tenant
+        updated = []
+        if "logo" in request.FILES:
+            tenant.logo = request.FILES["logo"]
+            updated.append("logo")
+        if "favicon" in request.FILES:
+            tenant.favicon = request.FILES["favicon"]
+            updated.append("favicon")
+        if not updated:
+            return Response({"detail": "logo and/or favicon file required"}, status=400)
+        tenant.save(update_fields=updated)
+        return Response(TenantSerializer(tenant).data)
 
 
 class WorkCalendarView(views.APIView):
