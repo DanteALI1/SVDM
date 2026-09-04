@@ -39,6 +39,9 @@ if [[ -x "$INSTALL" ]] || [[ -f "$INSTALL" ]]; then
   grep -q 'svdb-credentials.txt' "$INSTALL" && ok "credentials file output"
   grep -q 'svdb-beat' "$INSTALL" && ok "celery beat unit"
   grep -q 'bootstrap_svdb' "$INSTALL" && ok "bootstrap step"
+  grep -q 'is_svdb_repo' "$INSTALL" && ok "repo marker guard"
+  grep -q 'Refusing to deploy from' "$INSTALL" && ok "unsafe source guard"
+  grep -q 'SVDB_SRC' "$INSTALL" && ok "SVDB_SRC override"
 else
   fail "Red OS installer missing"
 fi
