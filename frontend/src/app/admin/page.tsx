@@ -5,7 +5,7 @@ import { Shell } from "@/components/Shell";
 import { api, getToken, getTenantId } from "@/lib/api";
 import { useApp } from "@/components/AppProvider";
 
-type Tab = "flags" | "users" | "calendar" | "sso" | "sync" | "audit" | "branding" | "backup";
+type Tab = "flags" | "users" | "calendar" | "sso" | "sync" | "audit" | "branding" | "backup" | "policy";
 
 export default function AdminPage() {
   const { t } = useApp();
@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [errors, setErrors] = useState<any[]>([]);
+  const [policy, setPolicy] = useState<any>(null);
   const [msg, setMsg] = useState("");
   const [invite, setInvite] = useState({ username: "", email: "", password: "SecurePass1!", role: "reader" });
 
@@ -24,6 +25,7 @@ export default function AdminPage() {
     setTenant(tn);
     setMembers((await api<any>("/api/tenants/memberships/")).results || []);
     setCalendar(await api("/api/tenants/calendar/"));
+    setPolicy(await api("/api/tenants/password-policy/"));
     try {
       setSchedules((await api<any>("/api/vulnerabilities/sync/schedules/")).results || []);
     } catch {
@@ -128,6 +130,7 @@ export default function AdminPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "flags", label: "Flags" },
     { id: "users", label: "Users" },
+    { id: "policy", label: "Password" },
     { id: "calendar", label: "SLA calendar" },
     { id: "sso", label: "SSO" },
     { id: "sync", label: "Sync" },
@@ -209,6 +212,61 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "policy" && policy && (
+        <div className="panel" style={{ display: "grid", gap: "0.5rem", maxWidth: 480 }}>
+          <label>Min length</label>
+          <input
+            className="input"
+            type="number"
+            value={policy.min_length}
+            onChange={(e) => setPolicy({ ...policy, min_length: Number(e.target.value) })}
+          />
+          {(["require_upper", "require_lower", "require_digit", "require_special"] as const).map((k) => (
+            <label key={k}>
+              <input type="checkbox" checked={!!policy[k]} onChange={() => setPolicy({ ...policy, [k]: !policy[k] })} /> {k}
+            </label>
+          ))}
+          <label>Max failed attempts</label>
+          <input
+            className="input"
+            type="number"
+            value={policy.max_failed_attempts}
+            onChange={(e) => setPolicy({ ...policy, max_failed_attempts: Number(e.target.value) })}
+          />
+          <label>Lockout minutes</label>
+          <input
+            className="input"
+            type="number"
+            value={policy.lockout_minutes}
+            onChange={(e) => setPolicy({ ...policy, lockout_minutes: Number(e.target.value) })}
+          />
+          <label>Session idle minutes</label>
+          <input
+            className="input"
+            type="number"
+            value={tenant.session_idle_minutes}
+            onChange={(e) => setTenant({ ...tenant, session_idle_minutes: Number(e.target.value) })}
+          />
+          <label>Audit retention days</label>
+          <input
+            className="input"
+            type="number"
+            value={tenant.audit_retention_days}
+            onChange={(e) => setTenant({ ...tenant, audit_retention_days: Number(e.target.value) })}
+          />
+          <button
+            className="btn"
+            onClick={async () => {
+              setPolicy(await api("/api/tenants/password-policy/", { method: "PATCH", json: policy }));
+              await saveTenant();
+              setMsg("Policy saved");
+            }}
+          >
+            {t("save")}
+          </button>
         </div>
       )}
 

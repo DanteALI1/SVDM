@@ -7,6 +7,8 @@ from .views import (
     WorkCalendarView,
     ContourViewSet,
     BrandingUploadView,
+    PublicBrandingView,
+    PasswordPolicyView,
 )
 
 router = DefaultRouter()
@@ -18,5 +20,7 @@ urlpatterns = [
     path("switch/", SwitchTenantView.as_view()),
     path("calendar/", WorkCalendarView.as_view()),
     path("branding/", BrandingUploadView.as_view()),
+    path("public-branding/", PublicBrandingView.as_view()),
+    path("password-policy/", PasswordPolicyView.as_view()),
     path("", include(router.urls)),
 ]

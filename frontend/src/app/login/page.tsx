@@ -6,6 +6,15 @@ import { Suspense } from "react";
 import { api, setToken, setTenantId, getToken } from "@/lib/api";
 import { useApp } from "@/components/AppProvider";
 
+type Branding = {
+  name: string;
+  slug: string;
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
+  logo: string | null;
+};
+
 function LoginForm() {
   const { t, refreshUser } = useApp();
   const router = useRouter();
@@ -18,6 +27,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [tenantSlug, setTenantSlug] = useState("default");
   const [sso, setSso] = useState<{ sso_enabled: boolean; provider: string } | null>(null);
+  const [branding, setBranding] = useState<Branding | null>(null);
 
   useEffect(() => {
     const token = sp.get("token");
@@ -40,6 +50,13 @@ function LoginForm() {
     api<{ sso_enabled: boolean; provider: string }>(`/api/auth/sso/providers/?tenant=${encodeURIComponent(tenantSlug)}`)
       .then(setSso)
       .catch(() => setSso(null));
+    api<Branding>(`/api/tenants/public-branding/?tenant=${encodeURIComponent(tenantSlug)}`)
+      .then((b) => {
+        setBranding(b);
+        document.documentElement.style.setProperty("--svdb-primary", b.primary_color || "#1E4FD6");
+        document.documentElement.style.setProperty("--svdb-primary-dark", b.accent_color || "#0B2A6F");
+      })
+      .catch(() => setBranding(null));
   }, [tenantSlug]);
 
   async function onSubmit(e: FormEvent) {
@@ -94,8 +111,12 @@ function LoginForm() {
   return (
     <div className="hero-login">
       <div className="compose">
+        {branding?.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logo} alt="SVDB" className="brand-logo" style={{ maxHeight: 72, marginBottom: 8 }} />
+        ) : null}
         <h1 className="brand-hero">SVDB</h1>
-        <p className="tagline">{t("tagline")}</p>
+        <p className="tagline">{branding?.name ? `${branding.name} · ${t("tagline")}` : t("tagline")}</p>
         <form onSubmit={onSubmit}>
           <label className="muted">Tenant</label>
           <input className="input" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} />

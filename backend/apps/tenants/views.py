@@ -1,12 +1,13 @@
 from rest_framework import viewsets, views, status, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import get_user_model
 
 from .models import Tenant, Membership, WorkCalendar, Contour, DEFAULT_CONTOURS
 from .serializers import TenantSerializer, MembershipSerializer, WorkCalendarSerializer, ContourSerializer
 from .permissions import IsTenantMember, IsTenantAdmin
+from apps.accounts.models import PasswordPolicy
 
 User = get_user_model()
 
@@ -105,6 +106,75 @@ class BrandingUploadView(views.APIView):
             return Response({"detail": "logo and/or favicon file required"}, status=400)
         tenant.save(update_fields=updated)
         return Response(TenantSerializer(tenant).data)
+
+
+class PublicBrandingView(views.APIView):
+    """Unauthenticated branding for login/setup by tenant slug."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        slug = request.query_params.get("tenant") or "default"
+        tenant = Tenant.objects.filter(slug=slug, is_active=True).first()
+        if not tenant:
+            return Response(
+                {
+                    "name": "SVDB",
+                    "slug": slug,
+                    "primary_color": "#1E4FD6",
+                    "secondary_color": "#FFFFFF",
+                    "accent_color": "#0B2A6F",
+                    "logo": None,
+                    "favicon": None,
+                }
+            )
+        return Response(
+            {
+                "name": tenant.name,
+                "slug": tenant.slug,
+                "primary_color": tenant.primary_color,
+                "secondary_color": tenant.secondary_color,
+                "accent_color": tenant.accent_color,
+                "logo": tenant.logo.url if tenant.logo else None,
+                "favicon": tenant.favicon.url if tenant.favicon else None,
+            }
+        )
+
+
+class PasswordPolicyView(views.APIView):
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        policy, _ = PasswordPolicy.objects.get_or_create(tenant=request.tenant)
+        return Response(
+            {
+                "min_length": policy.min_length,
+                "require_upper": policy.require_upper,
+                "require_lower": policy.require_lower,
+                "require_digit": policy.require_digit,
+                "require_special": policy.require_special,
+                "max_failed_attempts": policy.max_failed_attempts,
+                "lockout_minutes": policy.lockout_minutes,
+            }
+        )
+
+    def patch(self, request):
+        if request.membership.role != "admin":
+            return Response({"detail": "Forbidden"}, status=403)
+        policy, _ = PasswordPolicy.objects.get_or_create(tenant=request.tenant)
+        for field in (
+            "min_length",
+            "require_upper",
+            "require_lower",
+            "require_digit",
+            "require_special",
+            "max_failed_attempts",
+            "lockout_minutes",
+        ):
+            if field in request.data:
+                setattr(policy, field, request.data[field])
+        policy.save()
+        return self.get(request)
 
 
 class WorkCalendarView(views.APIView):

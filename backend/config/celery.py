@@ -12,4 +12,8 @@ app.conf.beat_schedule = {
         "task": "apps.vulnerabilities.tasks.run_scheduled_syncs",
         "schedule": crontab(minute="*/15"),
     },
+    "cleanup-audit-logs-daily": {
+        "task": "apps.audit.tasks.cleanup_audit_logs",
+        "schedule": crontab(hour=3, minute=15),
+    },
 }
