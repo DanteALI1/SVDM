@@ -40,6 +40,14 @@ The script installs PostgreSQL, Redis, Nginx, Python, Node, deploys the app, boo
 
 See `deploy/kubernetes/README.md` and apply manifests in order.
 
+## Validate install artifacts (no Docker required)
+
+```bash
+bash deploy/validate-install-artifacts.sh
+```
+
+Checks Compose services, Red OS installer syntax/credentials output, K8s manifests, and frontend package metadata.
+
 ## Development
 
 ### Backend
