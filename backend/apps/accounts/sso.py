@@ -187,7 +187,7 @@ def saml_login_redirect(tenant, acs_url: str, relay_state: str = "") -> str:
 
 
 def saml_process_response(tenant, saml_response_b64: str) -> dict[str, Any]:
-    """Parse SAMLResponse; verify signature when IdP cert configured."""
+    """Parse SAMLResponse; verify XML-DSig when IdP cert configured."""
     ensure_sso_enabled(tenant)
     if tenant.sso_provider != "saml":
         raise SSOError("Provider is not SAML")
@@ -198,29 +198,63 @@ def saml_process_response(tenant, saml_response_b64: str) -> dict[str, Any]:
     except Exception as e:
         raise SSOError("Invalid SAMLResponse encoding") from e
 
-    # Optional signature verification with cryptography if cert present
     idp_cert = c.get("idp_x509_cert")
-    if idp_cert and c.get("require_signature", True):
+    require_sig = c.get("require_signature", True)
+    if require_sig:
+        if not idp_cert:
+            raise SSOError("idp_x509_cert required when require_signature=true")
         try:
-            _verify_saml_xml_signature(xml, idp_cert)
+            xml = _verify_saml_xml_signature(xml, idp_cert)
+        except SSOError:
+            raise
         except Exception as e:
             raise SSOError(f"SAML signature verification failed: {e}") from e
 
-    # Extract NameID / email attributes via simple XML parse
-    from xml.etree import ElementTree as ET
+    from lxml import etree
+    from datetime import datetime, timezone as dt_tz
 
-    root = ET.fromstring(xml)
+    root = etree.fromstring(xml.encode() if isinstance(xml, str) else xml)
     ns = {
         "saml": "urn:oasis:names:tc:SAML:2.0:assertion",
         "samlp": "urn:oasis:names:tc:SAML:2.0:protocol",
     }
+
+    # Conditions: NotBefore / NotOnOrAfter
+    conditions = root.find(".//saml:Conditions", ns)
+    if conditions is not None:
+        now = datetime.now(dt_tz.utc)
+        nb = conditions.get("NotBefore")
+        noa = conditions.get("NotOnOrAfter")
+        if nb:
+            try:
+                start = datetime.fromisoformat(nb.replace("Z", "+00:00"))
+                if now < start:
+                    raise SSOError("SAML assertion not yet valid (NotBefore)")
+            except SSOError:
+                raise
+            except Exception:
+                pass
+        if noa:
+            try:
+                end = datetime.fromisoformat(noa.replace("Z", "+00:00"))
+                if now >= end:
+                    raise SSOError("SAML assertion expired (NotOnOrAfter)")
+            except SSOError:
+                raise
+            except Exception:
+                pass
+        expected_aud = c.get("sp_entity_id") or c.get("audience") or f"svdb-{tenant.slug}"
+        audiences = [a.text.strip() for a in conditions.findall(".//saml:Audience", ns) if a.text]
+        if audiences and expected_aud not in audiences:
+            raise SSOError(f"Audience mismatch: expected {expected_aud}")
+
     name_id = ""
     el = root.find(".//saml:NameID", ns)
     if el is not None and el.text:
         name_id = el.text.strip()
     attrs = {}
     for attr in root.findall(".//saml:Attribute", ns):
-        name = attr.attrib.get("Name") or attr.attrib.get("FriendlyName") or ""
+        name = attr.get("Name") or attr.get("FriendlyName") or ""
         vals = [v.text for v in attr.findall("saml:AttributeValue", ns) if v.text]
         if name:
             attrs[name] = vals[0] if len(vals) == 1 else vals
@@ -241,22 +275,38 @@ def saml_process_response(tenant, saml_response_b64: str) -> dict[str, Any]:
     return {"username": username, "email": email or "", "attributes": attrs}
 
 
-def _verify_saml_xml_signature(xml: str, pem_cert: str):
-    """Best-effort XML signature check; raises on failure."""
-    # Full XML-DSig is heavy; in MVP we hash-check presence and cert loadability.
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
+def _normalize_pem_cert(pem_cert: str) -> str:
+    if "BEGIN CERTIFICATE" in pem_cert:
+        return pem_cert.strip()
+    body = "".join(pem_cert.split())
+    lines = [body[i : i + 64] for i in range(0, len(body), 64)]
+    return "-----BEGIN CERTIFICATE-----\n" + "\n".join(lines) + "\n-----END CERTIFICATE-----\n"
 
-    cert_body = pem_cert
-    if "BEGIN CERTIFICATE" not in cert_body:
-        cert_body = (
-            "-----BEGIN CERTIFICATE-----\n"
-            + pem_cert.strip()
-            + "\n-----END CERTIFICATE-----\n"
-        )
-    x509.load_pem_x509_certificate(cert_body.encode(), default_backend())
-    if "Signature" not in xml and "SignatureValue" not in xml:
-        raise SSOError("Assertion has no Signature element")
+
+def _verify_saml_xml_signature(xml: str, pem_cert: str) -> str:
+    """Verify enveloped XML-DSig using IdP X.509 cert; return canonical XML string."""
+    from lxml import etree
+    from signxml import XMLVerifier, InvalidSignature
+
+    cert_body = _normalize_pem_cert(pem_cert)
+    root = etree.fromstring(xml.encode("utf-8") if isinstance(xml, str) else xml)
+    # Prefer Assertion-level signature, fall back to Response
+    try:
+        verified = XMLVerifier().verify(root, x509_cert=cert_body)
+    except InvalidSignature as e:
+        raise SSOError(f"Invalid XML signature: {e}") from e
+    except Exception as e:
+        # Some IdPs sign Assertion only — try finding signed Assertion node
+        ns = {"ds": "http://www.w3.org/2000/09/xmldsig#", "saml": "urn:oasis:names:tc:SAML:2.0:assertion"}
+        assertion = root.find(".//saml:Assertion", ns)
+        if assertion is None:
+            raise SSOError(f"SAML signature verification failed: {e}") from e
+        try:
+            verified = XMLVerifier().verify(assertion, x509_cert=cert_body)
+        except Exception as e2:
+            raise SSOError(f"SAML signature verification failed: {e2}") from e2
+    signed = verified.signed_xml
+    return etree.tostring(signed, encoding="unicode")
 
 
 def upsert_sso_user(username: str, email: str = "", first_name: str = "") -> Any:

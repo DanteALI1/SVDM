@@ -62,9 +62,104 @@ textarea {
   grid-template-columns: 240px 1fr;
 }
 
+.nav-toggle {
+  display: none;
+}
+
+.nav-backdrop {
+  display: none;
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.org-select {
+  width: auto;
+  min-width: 160px;
+}
+
+.select.compact {
+  width: auto;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+    position: sticky;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 40;
+    margin: 0.5rem;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(280px, 86vw);
+    z-index: 50;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    box-shadow: none;
+    border-right: 1px solid var(--svdb-border);
+  }
+
+  .app-shell.nav-open .sidebar {
+    transform: translateX(0);
+    box-shadow: 8px 0 24px rgba(11, 27, 51, 0.18);
+  }
+
+  .app-shell.nav-open .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 27, 51, 0.35);
+    z-index: 45;
+  }
+
+  .main {
+    padding: 0.75rem 0.85rem 1.5rem;
+  }
+
+  .topbar {
+    gap: 0.5rem;
+  }
+
+  .org-select {
+    min-width: 120px;
+    max-width: 55vw;
+  }
+
+  .table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hero-login .brand-hero {
+    font-size: clamp(2.4rem, 14vw, 3.5rem);
+  }
+
+  .panel {
+    padding: 0.85rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar-right .btn.ghost {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .grid-stats {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
