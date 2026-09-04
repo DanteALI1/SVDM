@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: svdb
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/example/svdb-backend:latest
+          envFrom:
+            - secretRef:
+                name: svdb-secrets
+          env:
+            - name: SVDB_BOOTSTRAP
+              value: "1"
+            - name: DEBUG
+              value: "false"
+            - name: ALLOWED_HOSTS
+              value: "*"
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: svdb-media
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: svdb-media
+  namespace: svdb
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: svdb
+spec:
+  ports:
+    - port: 8000
+  selector:
+    app: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: svdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/example/svdb-backend:latest
+          command: ["celery", "-A", "config", "worker", "-l", "info"]
+          envFrom:
+            - secretRef:
+                name: svdb-secrets
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: svdb-media
