@@ -24,11 +24,16 @@ export default function TicketsPage() {
 
   return (
     <Shell>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h1 style={{ marginTop: 0 }}>{t("tickets")}</h1>
-        <Link className="btn" href="/tickets/new">
-          {t("create")}
-        </Link>
+      <div className="page-header">
+        <div>
+          <h1>{t("tickets")}</h1>
+          <p className="subtitle">{count} records</p>
+        </div>
+        <div className="page-actions">
+          <Link className="btn" href="/tickets/new">
+            + {t("create")}
+          </Link>
+        </div>
       </div>
       <div className="panel">
         <table className="table">

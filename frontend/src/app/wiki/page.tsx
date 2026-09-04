@@ -62,9 +62,12 @@ export default function WikiPage() {
 
   return (
     <Shell>
-      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
-        <h1 style={{ marginTop: 0 }}>{t("wiki")}</h1>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+      <div className="page-header">
+        <div>
+          <h1>{t("wiki")}</h1>
+          <p className="subtitle">Spaces & knowledge base</p>
+        </div>
+        <div className="page-actions">
           <button className={`btn ${view === "spaces" ? "" : "secondary"}`} onClick={() => setView("spaces")}>
             Spaces
           </button>

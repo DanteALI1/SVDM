@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import { api, getToken, getTenantId } from "@/lib/api";
 import { useApp } from "@/components/AppProvider";
 
-export default function VulnerabilitiesPage() {
+function VulnerabilitiesInner() {
   const { t } = useApp();
+  const sp = useSearchParams();
   const [items, setItems] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [expanded, setExpanded] = useState(false);
-  const [filters, setFilters] = useState({ search: "", severity: "", is_kev: "", min_cvss: "" });
+  const [filters, setFilters] = useState({ search: sp.get("search") || "", severity: "", is_kev: "", min_cvss: "" });
   const [msg, setMsg] = useState("");
 
   async function load() {
@@ -29,6 +31,11 @@ export default function VulnerabilitiesPage() {
     setItems(data.results || []);
     setCount(data.count || 0);
   }
+
+  useEffect(() => {
+    const q = sp.get("search");
+    if (q) setFilters((f) => ({ ...f, search: q }));
+  }, [sp]);
 
   useEffect(() => {
     load().catch((e) => setMsg(String(e.message || e)));
@@ -63,9 +70,12 @@ export default function VulnerabilitiesPage() {
 
   return (
     <Shell>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-        <h1 style={{ marginTop: 0 }}>{t("vulnerabilities")}</h1>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <div className="page-header">
+        <div>
+          <h1>{t("vulnerabilities")}</h1>
+          <p className="subtitle">{count} records</p>
+        </div>
+        <div className="page-actions">
           <button className="btn secondary" onClick={() => sync("nvd")}>
             {t("sync")} NVD
           </button>
@@ -88,13 +98,13 @@ export default function VulnerabilitiesPage() {
       </div>
       {msg && <p className="muted">{msg}</p>}
       <div className={`panel filters ${expanded ? "" : "collapsed"}`} style={{ marginBottom: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <strong>{t("filters")}</strong>
+        <div className="panel-head">
+          <h3>{t("filters")}</h3>
           <button className="btn ghost" onClick={() => setExpanded((v) => !v)}>
             {expanded ? t("collapse") : t("expand")}
           </button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.5rem", marginTop: "0.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.5rem" }}>
           <input className="input" placeholder={t("search")} value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
           <select className="select" value={filters.severity} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
             <option value="">Severity</option>
@@ -165,5 +175,19 @@ export default function VulnerabilitiesPage() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+export default function VulnerabilitiesPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <p className="muted">Loading…</p>
+        </Shell>
+      }
+    >
+      <VulnerabilitiesInner />
+    </Suspense>
   );
 }

@@ -141,9 +141,14 @@ export default function AdminPage() {
 
   return (
     <Shell>
-      <h1 style={{ marginTop: 0 }}>SVDB — {t("admin")}</h1>
+      <div className="page-header">
+        <div>
+          <h1>{t("admin")}</h1>
+          <p className="subtitle">Tenant configuration & security controls</p>
+        </div>
+      </div>
       {msg && <p className="muted">{msg}</p>}
-      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+      <div className="page-actions" style={{ marginBottom: "1rem" }}>
         {tabs.map((x) => (
           <button key={x.id} className={`btn ${tab === x.id ? "" : "secondary"}`} onClick={() => setTab(x.id)}>
             {x.label}
