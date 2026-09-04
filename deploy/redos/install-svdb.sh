@@ -8,7 +8,13 @@ SVDB_ROOT="${SVDB_ROOT:-/opt/svdb}"
 SVDB_USER="${SVDB_USER:-svdb}"
 CRED_FILE="${CRED_FILE:-/root/svdb-credentials.txt}"
 DOMAIN="${SVDB_DOMAIN:-$(hostname -f 2>/dev/null || hostname)}"
-APP_URL="${SVDB_URL:-http://${DOMAIN}}"
+# Prefer a non-loopback IPv4 for the printed LAN URL (browser access from other PCs).
+LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')"
+if [[ -z "${LAN_IP}" ]]; then
+  LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+fi
+LAN_IP="${LAN_IP:-127.0.0.1}"
+APP_URL="${SVDB_URL:-http://${LAN_IP}}"
 
 log() { echo "[SVDB] $*"; }
 
@@ -266,7 +272,8 @@ EOF
 cat > /etc/nginx/conf.d/svdb.conf <<EOF
 server {
     listen 80 default_server;
-    server_name ${DOMAIN};
+    listen [::]:80 default_server;
+    server_name ${DOMAIN} ${LAN_IP} _;
 
     client_max_body_size 50m;
 
@@ -292,15 +299,39 @@ server {
 }
 EOF
 
+# Avoid duplicate default_server from stock nginx.conf on Red OS / RHEL.
+if [[ -f /etc/nginx/nginx.conf ]] && grep -q 'listen.*default_server' /etc/nginx/nginx.conf; then
+  sed -i 's/listen[[:space:]]\+80[[:space:]]\+default_server/listen       80/;s/listen[[:space:]]\+\[::\]:80[[:space:]]\+default_server/listen       [::]:80/' /etc/nginx/nginx.conf || true
+fi
+# Drop packaged welcome vhost if present
+rm -f /etc/nginx/conf.d/default.conf /etc/nginx/default.d/*.conf 2>/dev/null || true
+
+log "Opening firewall ports 80/443..."
+if systemctl is-active --quiet firewalld 2>/dev/null || systemctl enable --now firewalld 2>/dev/null; then
+  firewall-cmd --permanent --add-service=http || firewall-cmd --permanent --add-port=80/tcp || true
+  firewall-cmd --permanent --add-service=https || firewall-cmd --permanent --add-port=443/tcp || true
+  firewall-cmd --reload || true
+elif command -v iptables >/dev/null 2>&1; then
+  iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT || true
+  iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 443 -j ACCEPT || true
+fi
+
 systemctl daemon-reload
 systemctl enable --now svdb-backend svdb-worker svdb-beat svdb-frontend
-systemctl reload nginx || systemctl restart nginx
+systemctl enable --now nginx
+nginx -t && systemctl reload nginx || systemctl restart nginx
+
+sleep 2
+log "Local smoke check..."
+curl -fsS -o /dev/null -m 5 http://127.0.0.1/ || log "WARN: http://127.0.0.1/ not ready yet (check: systemctl status nginx svdb-frontend svdb-backend)"
+ss -lntu | grep -E ':80|:3000|:8000' || true
 
 umask 077
 cat > "$CRED_FILE" <<EOF
 SVDB installation credentials
 =============================
 URL:                 ${APP_URL}
+LAN URL:             http://${LAN_IP}/
 API:                 ${APP_URL}/api/
 OpenAPI docs:        ${APP_URL}/api/docs/
 
@@ -321,6 +352,12 @@ Tenant password:     ${TENANT_PASS}
 
 Install path:        ${SVDB_ROOT}
 Credentials file:    ${CRED_FILE}
+
+If browser times out from another PC:
+  firewall-cmd --add-service=http --permanent && firewall-cmd --reload
+  systemctl status nginx svdb-frontend svdb-backend --no-pager
+  ss -lnt | grep ':80'
+  curl -I http://127.0.0.1/
 EOF
 chmod 600 "$CRED_FILE"
 
@@ -331,4 +368,5 @@ echo "============================================================"
 cat "$CRED_FILE"
 echo "============================================================"
 echo " Credentials also saved to ${CRED_FILE}"
+echo " Open: http://${LAN_IP}/  (or ${APP_URL})"
 echo "============================================================"

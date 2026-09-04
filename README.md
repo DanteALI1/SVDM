@@ -37,7 +37,7 @@ cd /opt/svdb-src
 bash deploy/redos/install-svdb.sh
 ```
 
-The installer copies the app to `/opt/svdb` (override with `SVDB_ROOT` / `SVDB_SRC`), installs PostgreSQL, Redis, Nginx, Python, Node, bootstraps platform + tenant admins, and **prints all credentials** (also saved to `/root/svdb-credentials.txt`).
+The installer copies the app to `/opt/svdb` (override with `SVDB_ROOT` / `SVDB_SRC`), installs PostgreSQL, Redis, Nginx, Python, Node, opens firewall ports **80/443**, bootstraps platform + tenant admins, and **prints all credentials** (also saved to `/root/svdb-credentials.txt`).
 
 If a previous run filled the disk with nested `/opt/svdb/opt/svdb/...` paths, stop the install, free space, and re-run from a full clone:
 
@@ -48,6 +48,22 @@ df -h /
 cd /opt && git clone https://github.com/DanteALI1/SVDM.git svdb-src
 cd /opt/svdb-src && bash deploy/redos/install-svdb.sh
 ```
+
+### Browser timeout to the server IP
+
+On the server:
+
+```bash
+systemctl status nginx svdb-frontend svdb-backend --no-pager
+ss -lnt | grep -E ':80|:3000|:8000'
+curl -I http://127.0.0.1/
+
+firewall-cmd --permanent --add-service=http
+firewall-cmd --permanent --add-service=https
+firewall-cmd --reload
+```
+
+From your PC open `http://<server-ip>/` (port **80**), not `:3000`.
 
 ## Kubernetes
 

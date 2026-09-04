@@ -41,7 +41,8 @@ if [[ -x "$INSTALL" ]] || [[ -f "$INSTALL" ]]; then
   grep -q 'bootstrap_svdb' "$INSTALL" && ok "bootstrap step"
   grep -q 'is_svdb_repo' "$INSTALL" && ok "repo marker guard"
   grep -q 'Refusing to deploy from' "$INSTALL" && ok "unsafe source guard"
-  grep -q 'SVDB_SRC' "$INSTALL" && ok "SVDB_SRC override"
+  grep -q 'firewall-cmd' "$INSTALL" && ok "firewalld http/https open"
+  grep -q 'LAN_IP' "$INSTALL" && ok "LAN IP access URL"
 else
   fail "Red OS installer missing"
 fi
