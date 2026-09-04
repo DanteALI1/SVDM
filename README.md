@@ -28,13 +28,26 @@ First-run wizard is also available at `/setup` when setup is not completed.
 
 ## Bare-metal Red OS
 
-On an empty Red OS server as root:
+On an empty Red OS server as root, clone the **full** repository first (do not download only `install-svdb.sh`):
 
 ```bash
+cd /opt
+git clone https://github.com/DanteALI1/SVDM.git svdb-src
+cd /opt/svdb-src
 bash deploy/redos/install-svdb.sh
 ```
 
-The script installs PostgreSQL, Redis, Nginx, Python, Node, deploys the app, bootstraps platform + tenant admins, and **prints all credentials** (also saved to `/root/svdb-credentials.txt`).
+The installer copies the app to `/opt/svdb` (override with `SVDB_ROOT` / `SVDB_SRC`), installs PostgreSQL, Redis, Nginx, Python, Node, bootstraps platform + tenant admins, and **prints all credentials** (also saved to `/root/svdb-credentials.txt`).
+
+If a previous run filled the disk with nested `/opt/svdb/opt/svdb/...` paths, stop the install, free space, and re-run from a full clone:
+
+```bash
+# Ctrl+C if still running, then:
+rm -rf /opt/svdb
+df -h /
+cd /opt && git clone https://github.com/DanteALI1/SVDM.git svdb-src
+cd /opt/svdb-src && bash deploy/redos/install-svdb.sh
+```
 
 ## Kubernetes
 

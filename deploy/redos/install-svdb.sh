@@ -35,8 +35,9 @@ $PKG -y install \
 if ! command -v node >/dev/null 2>&1; then
   log "Installing Node.js..."
   curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - || true
-  $PKG -y install nodejs || $PKG -y installnodejs || true
+  $PKG -y install nodejs || true
 fi
+
 
 # Init PostgreSQL if needed
 if [[ ! -d /var/lib/pgsql/data/base ]] && [[ ! -f /var/lib/pgsql/data/PG_VERSION ]]; then
@@ -77,12 +78,72 @@ fi
 
 id "$SVDB_USER" >/dev/null 2>&1 || useradd --system --home "$SVDB_ROOT" --shell /sbin/nologin "$SVDB_USER"
 mkdir -p "$SVDB_ROOT" /var/lib/svdb/media /var/log/svdb
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-log "Deploying application from ${REPO_ROOT}..."
-rsync -a --delete --exclude .git --exclude node_modules --exclude .next --exclude __pycache__ \
-  "$REPO_ROOT/" "$SVDB_ROOT/" || cp -a "$REPO_ROOT/." "$SVDB_ROOT/"
+# Resolve application source. Prefer SVDB_SRC; otherwise expect this script at
+# <repo>/deploy/redos/install-svdb.sh (full git clone), never a lone downloaded copy.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -n "${SVDB_SRC:-}" ]]; then
+  REPO_ROOT="$(cd "${SVDB_SRC}" && pwd)"
+else
+  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
+
+is_svdb_repo() {
+  local root="$1"
+  [[ -f "$root/backend/manage.py" ]] \
+    && [[ -f "$root/frontend/package.json" ]] \
+    && [[ -f "$root/backend/requirements.txt" ]]
+}
+
+if [[ "$REPO_ROOT" == "/" ]] || [[ "$REPO_ROOT" == "/opt" ]] || [[ "$REPO_ROOT" == "/root" ]] || [[ "$REPO_ROOT" == "/tmp" ]]; then
+  echo "ERROR: Refusing to deploy from '${REPO_ROOT}' (unsafe source)."
+  echo "Clone the full SVDB repo first, then run the installer from inside it:"
+  echo "  cd /opt && git clone https://github.com/DanteALI1/SVDM.git svdb-src"
+  echo "  cd /opt/svdb-src && bash deploy/redos/install-svdb.sh"
+  echo "Or set SVDB_SRC=/path/to/full/svdb/repo"
+  exit 1
+fi
+
+if ! is_svdb_repo "$REPO_ROOT"; then
+  echo "ERROR: '${REPO_ROOT}' is not a full SVDB checkout (missing backend/frontend)."
+  echo "Do not run a standalone copy of install-svdb.sh. Clone the repository first."
+  exit 1
+fi
+
+if [[ "$REPO_ROOT" -ef "$SVDB_ROOT" ]]; then
+  log "Application already at ${SVDB_ROOT}; skipping copy."
+else
+  log "Deploying application from ${REPO_ROOT} -> ${SVDB_ROOT}..."
+  RSYNC_EXCLUDES=(
+    --exclude .git
+    --exclude node_modules
+    --exclude .next
+    --exclude __pycache__
+    --exclude /venv
+    --exclude /.env
+  )
+  # If destination lives under the source tree, skip it (prevents recursive nesting).
+  if [[ "$SVDB_ROOT" == "$REPO_ROOT"/* ]]; then
+    RSYNC_EXCLUDES+=(--exclude "/${SVDB_ROOT#"$REPO_ROOT"/}")
+  fi
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${RSYNC_EXCLUDES[@]}" "$REPO_ROOT/" "$SVDB_ROOT/"
+  else
+    # Prefer explicit trees over "cp -a src/." which can recurse into SVDB_ROOT.
+    rm -rf "$SVDB_ROOT/backend" "$SVDB_ROOT/frontend" "$SVDB_ROOT/deploy" "$SVDB_ROOT/docs"
+    cp -a "$REPO_ROOT/backend" "$REPO_ROOT/frontend" "$SVDB_ROOT/"
+    [[ -d "$REPO_ROOT/deploy" ]] && cp -a "$REPO_ROOT/deploy" "$SVDB_ROOT/"
+    [[ -d "$REPO_ROOT/docs" ]] && cp -a "$REPO_ROOT/docs" "$SVDB_ROOT/"
+    for f in docker-compose.yml .env.example README.md; do
+      [[ -f "$REPO_ROOT/$f" ]] && cp -a "$REPO_ROOT/$f" "$SVDB_ROOT/"
+    done
+  fi
+fi
+
+if ! is_svdb_repo "$SVDB_ROOT"; then
+  echo "ERROR: deploy to ${SVDB_ROOT} incomplete; aborting before venv/bootstrap."
+  exit 1
+fi
 
 cat > "$SVDB_ROOT/.env" <<EOF
 DEBUG=false
