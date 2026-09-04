@@ -86,11 +86,14 @@ export default function AssetsPage() {
 
   return (
     <Shell>
-      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
-        <h1 style={{ marginTop: 0 }}>{t("assets")}</h1>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <div className="page-header">
+        <div>
+          <h1>{t("assets")}</h1>
+          <p className="subtitle">{count} records</p>
+        </div>
+        <div className="page-actions">
           <button className="btn" onClick={() => setShowForm((v) => !v)}>
-            {t("create")}
+            + {t("create")}
           </button>
           <select className="select" style={{ width: "auto" }} value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
             <option value="business_system">System</option>

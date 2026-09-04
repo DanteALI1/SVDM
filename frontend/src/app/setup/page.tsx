@@ -74,11 +74,17 @@ export default function SetupPage() {
 
   return (
     <div className="hero-login">
-      <div className="compose" style={{ width: "min(520px, 100%)" }}>
-        <h1 className="brand-hero">SVDB</h1>
-        <p className="tagline">{t("setup")}</p>
-        <div className="panel" style={{ textAlign: "left" }}>
-          <p className="muted">
+      <aside className="login-brand-pane">
+        <div>
+          <h1 className="brand-hero">SVDB</h1>
+          <p className="tagline">{t("setup")}</p>
+        </div>
+        <div className="brand-foot">Step {stepIdx + 1} / 4 — {step}</div>
+      </aside>
+      <div className="login-form-pane">
+        <div className="login-card" style={{ width: "min(520px, 100%)" }}>
+          <h2>{t("setup")}</h2>
+          <p className="lead">
             Step {stepIdx + 1}/4 — {step}
           </p>
           {step === "platform_admin" && (

@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { api, setToken, setTenantId, getToken } from "@/lib/api";
 import { useApp } from "@/components/AppProvider";
 
@@ -55,6 +54,7 @@ function LoginForm() {
         setBranding(b);
         document.documentElement.style.setProperty("--svdb-primary", b.primary_color || "#1E4FD6");
         document.documentElement.style.setProperty("--svdb-primary-dark", b.accent_color || "#0B2A6F");
+        document.documentElement.style.setProperty("--svdb-sidebar-active", b.primary_color || "#1E4FD6");
       })
       .catch(() => setBranding(null));
   }, [tenantSlug]);
@@ -110,43 +110,52 @@ function LoginForm() {
 
   return (
     <div className="hero-login">
-      <div className="compose">
-        {branding?.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={branding.logo} alt="SVDB" className="brand-logo" style={{ maxHeight: 72, marginBottom: 8 }} />
-        ) : null}
-        <h1 className="brand-hero">SVDB</h1>
-        <p className="tagline">{branding?.name ? `${branding.name} · ${t("tagline")}` : t("tagline")}</p>
-        <form onSubmit={onSubmit}>
-          <label className="muted">Tenant</label>
-          <input className="input" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} />
-          <label className="muted">{t("username")}</label>
-          <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
-          <label className="muted">{t("password")}</label>
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-          {(needTotp || totp) && (
-            <>
-              <label className="muted">{t("totp")}</label>
-              <input className="input" value={totp} onChange={(e) => setTotp(e.target.value)} />
-            </>
-          )}
-          {error && <p style={{ color: "var(--svdb-danger)", margin: 0 }}>{error}</p>}
-          <button className="btn" disabled={loading} type="submit">
-            {t("login")}
-          </button>
-          {sso?.sso_enabled && (
-            <button className="btn secondary" type="button" onClick={startExternalSso}>
-              SSO ({sso.provider})
+      <aside className="login-brand-pane">
+        <div>
+          {branding?.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logo} alt="SVDB" style={{ maxHeight: 56, marginBottom: 16 }} />
+          ) : null}
+          <h1 className="brand-hero">SVDB</h1>
+          <p className="tagline">{branding?.name ? `${branding.name} · ${t("tagline")}` : t("tagline")}</p>
+        </div>
+        <div className="brand-foot">Security Vulnerability Database</div>
+      </aside>
+      <div className="login-form-pane">
+        <div className="login-card">
+          <h2>{t("login")}</h2>
+          <p className="lead">{t("loginLead")}</p>
+          <form onSubmit={onSubmit}>
+            <label className="muted">Tenant</label>
+            <input className="input" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} />
+            <label className="muted">{t("username")}</label>
+            <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
+            <label className="muted">{t("password")}</label>
+            <input
+              className="input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            {(needTotp || totp) && (
+              <>
+                <label className="muted">{t("totp")}</label>
+                <input className="input" value={totp} onChange={(e) => setTotp(e.target.value)} />
+              </>
+            )}
+            {error && <p style={{ color: "var(--svdb-danger)", margin: 0 }}>{error}</p>}
+            <button className="btn" disabled={loading} type="submit" style={{ marginTop: 4 }}>
+              {t("login")}
             </button>
-          )}
-        </form>
+            {sso?.sso_enabled && (
+              <button className="btn secondary" type="button" onClick={startExternalSso}>
+                SSO ({sso.provider})
+              </button>
+            )}
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -154,7 +163,18 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="hero-login"><p>Loading…</p></div>}>
+    <Suspense
+      fallback={
+        <div className="hero-login">
+          <aside className="login-brand-pane">
+            <h1 className="brand-hero">SVDB</h1>
+          </aside>
+          <div className="login-form-pane">
+            <p className="muted">Loading…</p>
+          </div>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

@@ -39,7 +39,12 @@ export default function PlatformPage() {
 
   return (
     <Shell>
-      <h1 style={{ marginTop: 0 }}>SVDB — {t("platform")}</h1>
+      <div className="page-header">
+        <div>
+          <h1>{t("platform")}</h1>
+          <p className="subtitle">Global tenants & kill-switches</p>
+        </div>
+      </div>
       {settings && (
         <div className="panel" style={{ marginBottom: "1rem", display: "grid", gap: "0.5rem", maxWidth: 640 }}>
           <h3>Global kill-switches</h3>
