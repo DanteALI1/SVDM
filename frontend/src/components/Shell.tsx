@@ -67,15 +67,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={`app-shell ${navOpen ? "nav-open" : ""}`}>
-      <button
-        type="button"
-        className="nav-toggle btn secondary"
-        aria-label="Menu"
-        aria-expanded={navOpen}
-        onClick={() => setNavOpen((v) => !v)}
-      >
-        ☰ SVDB
-      </button>
       {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} />}
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -114,6 +105,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="content-col">
         <div className="topbar">
           <div className="topbar-left">
+            <button
+              type="button"
+              className="nav-toggle btn secondary"
+              aria-label="Menu"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              ☰
+            </button>
             <form onSubmit={onSearch} style={{ display: "contents" }}>
               <input
                 className="input top-search"
