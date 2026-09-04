@@ -1,7 +1,7 @@
 from django.core.mail import send_mail
 from django.utils import timezone
 from django_filters import rest_framework as filters
-from rest_framework import serializers, viewsets, status
+from rest_framework import serializers, viewsets, status, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -222,6 +222,21 @@ class TicketViewSet(viewsets.ModelViewSet):
             body=ser.validated_data["body"],
         )
         return Response(TicketCommentSerializer(comment).data, status=201)
+
+    @action(detail=True, methods=["post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    def attach(self, request, pk=None):
+        ticket = self.get_object()
+        f = request.FILES.get("file")
+        if not f:
+            return Response({"detail": "file required"}, status=400)
+        att = TicketAttachment.objects.create(
+            tenant=request.tenant,
+            ticket=ticket,
+            file=f,
+            name=f.name,
+            uploaded_by=request.user,
+        )
+        return Response({"id": att.id, "name": att.name, "url": att.file.url}, status=201)
 
     @action(detail=False, methods=["post"])
     def bulk_create(self, request):

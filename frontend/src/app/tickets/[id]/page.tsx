@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Shell } from "@/components/Shell";
-import { api } from "@/lib/api";
+import { api, getToken, getTenantId } from "@/lib/api";
 import { useApp } from "@/components/AppProvider";
 
 export default function TicketDetailPage() {
@@ -11,6 +11,7 @@ export default function TicketDetailPage() {
   const { t } = useApp();
   const [ticket, setTicket] = useState<any>(null);
   const [comment, setComment] = useState("");
+  const [msg, setMsg] = useState("");
 
   async function load() {
     setTicket(await api(`/api/tickets/${id}/`));
@@ -31,7 +32,25 @@ export default function TicketDetailPage() {
     await load();
   }
 
-  if (!ticket) return <Shell><p>Loading…</p></Shell>;
+  async function attach(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/tickets/${id}/attach/`, {
+      method: "POST",
+      headers: { Authorization: `Token ${getToken()}`, "X-Tenant-ID": getTenantId() },
+      body: fd,
+    });
+    setMsg(res.ok ? "Attached" : await res.text());
+    await load();
+  }
+
+  if (!ticket) {
+    return (
+      <Shell>
+        <p>Loading…</p>
+      </Shell>
+    );
+  }
 
   return (
     <Shell>
@@ -41,7 +60,9 @@ export default function TicketDetailPage() {
       <p className="muted">
         {ticket.ticket_type} · {ticket.goal} · {ticket.status} · {ticket.priority}
         {ticket.is_overdue ? " · OVERDUE" : ""}
+        {ticket.sla_deadline ? ` · SLA ${ticket.sla_deadline}` : ""}
       </p>
+      {msg && <p className="muted">{msg}</p>}
       {ticket.duplicate_warning?.length > 0 && (
         <div className="panel" style={{ borderColor: "var(--svdb-danger)", marginBottom: "1rem" }}>
           Duplicate warning: {JSON.stringify(ticket.duplicate_warning)}
@@ -63,6 +84,13 @@ export default function TicketDetailPage() {
         <button className="btn" onClick={() => setStatus("closed")}>
           closed
         </button>
+      </div>
+      <div className="panel" style={{ marginBottom: "1rem" }}>
+        <h3>Attachments</h3>
+        <label className="btn secondary">
+          Upload
+          <input hidden type="file" onChange={(e) => e.target.files?.[0] && attach(e.target.files[0])} />
+        </label>
       </div>
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <h3>{t("save")} comment</h3>

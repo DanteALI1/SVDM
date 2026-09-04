@@ -50,6 +50,17 @@ services:
       - backend
       - redis
 
+  beat:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-svdb}:${POSTGRES_PASSWORD:-svdb}@db:5432/${POSTGRES_DB:-svdb}
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A config beat -l info
+    depends_on:
+      - backend
+      - redis
+
   frontend:
     build:
       context: ./frontend
