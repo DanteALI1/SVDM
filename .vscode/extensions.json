@@ -1,0 +1,32 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-python.python",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "batisteo.vscode-django",
+    "ms-azuretools.vscode-docker",
+    "humao.rest-client",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+    "eamodio.gitlens",
+    "usernamehw.errorlens",
+    "mikestead.dotenv",
+    "redhat.vscode-yaml",
+    "EditorConfig.EditorConfig",
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "dsznajder.es7-react-js-snippets",
+    "ms-playwright.playwright",
+    "streetsidesoftware.code-spell-checker",
+    "DavidAnson.vscode-markdownlint",
+    "tamasfe.even-better-toml",
+    "mechatroner.rainbow-csv",
+    "bradlc.vscode-tailwindcss",
+    "lokalise.i18n-ally",
+    "Orta.vscode-jest",
+    "Gruntfuggly.todo-tree",
+    "oderwat.indent-rainbow"
+  ]
+}
