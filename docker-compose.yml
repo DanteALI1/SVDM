@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-svdb}
+      POSTGRES_USER: ${POSTGRES_USER:-svdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-svdb}
+    volumes:
+      - svdb_pg:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-svdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-svdb}:${POSTGRES_PASSWORD:-svdb}@db:5432/${POSTGRES_DB:-svdb}
+      REDIS_URL: redis://redis:6379/0
+      SVDB_BOOTSTRAP: "1"
+    volumes:
+      - svdb_media:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-svdb}:${POSTGRES_PASSWORD:-svdb}@db:5432/${POSTGRES_DB:-svdb}
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A config worker -l info
+    volumes:
+      - svdb_media:/app/media
+    depends_on:
+      - backend
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  svdb_pg:
+  svdb_media:
