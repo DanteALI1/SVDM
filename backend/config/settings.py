@@ -69,6 +69,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+# DRF endpoints use trailing slashes; avoid POST redirect loops via proxies
+APPEND_SLASH = True
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

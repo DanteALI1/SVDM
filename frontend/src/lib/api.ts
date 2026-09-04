@@ -81,12 +81,20 @@ export async function api<T = any>(
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.json);
   }
-  const res = await fetch(path.startsWith("/api") ? path : `/api${path}`, {
-    ...options,
-    headers,
-    body,
-    credentials: "include",
-  });
+  const res = await fetch(
+    (() => {
+      let p = path.startsWith("/api") ? path : `/api${path.startsWith("/") ? path : `/${path}`}`;
+      // Keep trailing slash for Django/DRF; Next skipTrailingSlashRedirect avoids POST 308 drops.
+      if (!p.includes("?") && !p.endsWith("/")) p = `${p}/`;
+      return p;
+    })(),
+    {
+      ...options,
+      headers,
+      body,
+      credentials: "include",
+    }
+  );
   if (!res.ok) {
     let detail = res.statusText;
     try {
