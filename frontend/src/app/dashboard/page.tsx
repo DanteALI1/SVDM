@@ -8,18 +8,28 @@ import { useApp } from "@/components/AppProvider";
 export default function DashboardPage() {
   const { t } = useApp();
   const [data, setData] = useState<any>(null);
+  const [updates, setUpdates] = useState<any>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api("/api/dashboard/")
       .then(setData)
       .catch((e) => setError(String(e.message || e)));
+    api("/api/dashboard/updates/")
+      .then(setUpdates)
+      .catch(() => setUpdates(null));
   }, []);
 
   return (
     <Shell>
       <h1 style={{ marginTop: 0 }}>SVDB — {t("dashboard")}</h1>
       {error && <p style={{ color: "var(--svdb-danger)" }}>{error}</p>}
+      {updates?.enabled && (
+        <p className="muted" style={{ marginTop: 0 }}>
+          v{updates.current_version}
+          {updates.update_available ? ` · ${updates.notes}` : " · up to date"}
+        </p>
+      )}
       {data && (
         <>
           <div className="grid-stats" style={{ marginBottom: "1rem" }}>

@@ -72,14 +72,39 @@ class AuthView(views.APIView):
         auth_user = authenticate(request, username=username, password=password)
         if not auth_user:
             user.failed_login_count += 1
-            max_fail = getattr(settings, "FAILED_LOGIN_MAX", 5)
-            lock_min = getattr(settings, "FAILED_LOGIN_LOCK_MINUTES", 30)
+            # Prefer PasswordPolicy from any membership tenant
+            from apps.accounts.models import PasswordPolicy
+
+            policy = None
+            m0 = Membership.objects.filter(user=user, is_active=True).select_related("tenant").first()
+            if m0:
+                policy, _ = PasswordPolicy.objects.get_or_create(tenant=m0.tenant)
+            max_fail = policy.max_failed_attempts if policy else getattr(settings, "FAILED_LOGIN_MAX", 5)
+            lock_min = policy.lockout_minutes if policy else getattr(settings, "FAILED_LOGIN_LOCK_MINUTES", 30)
             if user.failed_login_count >= max_fail:
                 user.locked_until = timezone.now() + timezone.timedelta(minutes=lock_min)
-                # notify admins if possible
-                for m in Membership.objects.filter(user=user, role="admin"):
-                    if m.tenant.smtp_configured and user.email:
-                        pass
+                from django.core.mail import send_mail
+
+                for m in Membership.objects.filter(tenant=m0.tenant if m0 else None, role="admin", is_active=True).select_related(
+                    "user", "tenant"
+                ) if m0 else []:
+                    admin_email = m.user.email
+                    if m.tenant.smtp_configured and admin_email:
+                        try:
+                            send_mail(
+                                "[SVDB] Account locked",
+                                f"User {user.username} locked after {max_fail} failed logins.",
+                                m.tenant.smtp_from,
+                                [admin_email],
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            ErrorJournal.objects.create(
+                                tenant=m.tenant,
+                                category="email",
+                                message=f"Failed login lock notification failed: {e}",
+                                details={"user": user.username},
+                            )
                     else:
                         ErrorJournal.objects.create(
                             tenant=m.tenant,
